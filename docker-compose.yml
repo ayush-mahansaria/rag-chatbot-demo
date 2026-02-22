@@ -1,0 +1,66 @@
+version: "3.9"
+
+# ── Spin up the full stack with: docker compose up ────────────────────────────
+#
+#   Service   Port    Description
+#   ───────   ────    ───────────
+#   api       8000    FastAPI REST  →  http://localhost:8000/docs
+#   ui        8501    Streamlit UI  →  http://localhost:8501
+#
+# Both services share the same data/ volume — documents uploaded via the UI
+# are immediately available to the API without restart.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  api:
+    build:
+      context: .
+      target: runtime
+    container_name: rag-api
+    command: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data                   # mount document directory
+      - ./vectorstore:/app/vectorstore     # persist FAISS index between restarts
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      target: runtime
+    container_name: rag-ui
+    command: >
+      streamlit run app.py
+        --server.port 8501
+        --server.address 0.0.0.0
+        --server.headless true
+        --browser.gatherUsageStats false
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./vectorstore:/app/vectorstore
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  data:
+  vectorstore:
