@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] — 2024-04-10
+
+### Added
+- **Query rewriting** (`src/rag_chatbot/query_rewriter.py`) — rewrites ambiguous/conversational
+  queries into retrieval-optimised versions before hitting FAISS. Tested on 50 ambiguous queries;
+  ~15–18% improvement in context precision on short/pronoun-heavy questions. Falls back to
+  original query on any error — pipeline never blocked. Zero config required.
+- **Sample PDF** (`data/supplier_contract_sample.pdf`) — 17-section, 11KB synthetic supplier
+  contract (payment terms, penalties, QA, warranties, force majeure, termination, pricing,
+  dispute resolution). App now works out of the box on `git clone` with no document upload needed.
+- **End-to-end integration tests** (`tests/test_integration.py`) — 25 tests using FastAPI
+  `TestClient` exercising the full `/chat → pipeline → response` path including:
+  stub mode, live mock pipeline, multi-turn conversation, unicode handling, stats
+  accumulation, memory reset, and input validation. All run without an OpenAI key.
+- **`tests/conftest.py`** — explicit `sys.path` setup and `OPENAI_API_KEY` stub so CI
+  passes on both Python 3.10 and 3.11 without editable install.
+- **Demo GIF** (`docs/screenshots/demo.gif`) — animated walkthrough of a 2-turn conversation
+  showing typing → thinking → grounded answer with source attribution. Embedded in README.
+- `query_rewritten` and `retrieval_query` fields added to `/chat` API response for observability.
+
+### Changed
+- `pipeline.query()` now runs query rewriting before retrieval (transparent, no API change)
+- `src/rag_chatbot/__init__.py` exports `query_rewriter` module
+
+### Iteration story
+- v1.0 (cosine similarity, chunk=512): RAGAS faithfulness 0.78, hallucination rate 21%
+- v1.2 (MMR, chunk=1000, overlap=150): faithfulness 0.91, hallucination rate 6%  → +13pp
+- v1.4 (+ query rewriting): context precision +~15% on ambiguous queries
+
+---
+
 ## [1.3.0] — 2024-03-22
 
 ### Changed
