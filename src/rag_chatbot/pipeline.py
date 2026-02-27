@@ -33,14 +33,14 @@ class RAGPipeline:
     # ── Lazy imports (keep startup fast; fail clearly if deps missing) ──────
     def _imports(self):
         try:
-            from langchain.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
-            from langchain.text_splitter import RecursiveCharacterTextSplitter
-            from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
-            from langchain.vectorstores import FAISS
-            from langchain.chat_models import ChatOpenAI
+            from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+            from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            from langchain_community.vectorstores import FAISS
             from langchain.chains import ConversationalRetrievalChain
             from langchain.memory import ConversationBufferWindowMemory
-            from langchain.callbacks import get_openai_callback
+            from langchain_community.callbacks.manager import get_openai_callback
             return (PyPDFLoader, TextLoader, DirectoryLoader,
                     RecursiveCharacterTextSplitter,
                     OpenAIEmbeddings, HuggingFaceEmbeddings,
@@ -103,7 +103,7 @@ class RAGPipeline:
         (_, _, _, _, _, _,
          FAISS, *_) = self._imports()
         if self.config.vector_db_exists():
-            vs = FAISS.load_local(self.config.vector_db_path, self._get_embeddings())
+            vs = FAISS.load_local(self.config.vector_db_path, self._get_embeddings(), allow_dangerous_deserialization=True)
             logger.info("FAISS index loaded from disk.")
             return vs
         return None
@@ -161,7 +161,13 @@ class RAGPipeline:
             self.ingest(source_dir)
 
     def query(self, question: str) -> dict:
-        """Run a query. Returns answer, sources, token usage."""
+        """
+        Run a query. Returns answer, sources, token usage.
+
+        Applies query rewriting before retrieval when the question is
+        ambiguous or conversational — see src/rag_chatbot/query_rewriter.py
+        for the full decision logic and rationale.
+        """
         if self.chain is None:
             raise RuntimeError(
                 "Pipeline not initialised. Call initialize() or ingest() first."
@@ -169,8 +175,23 @@ class RAGPipeline:
         (_, _, _, _, _, _, _, _, _, _,
          get_openai_callback) = self._imports()
 
+        # ── Query rewriting (improves retrieval on ambiguous/short questions) ──
+        try:
+            from .query_rewriter import rewrite_query
+            chat_history = []
+            if self.chain and hasattr(self.chain, "memory"):
+                chat_history = self.chain.memory.chat_memory.messages
+            llm = getattr(self.chain, "combine_docs_chain", None)
+            retrieval_question = rewrite_query(question, chat_history, llm)
+        except Exception as e:
+            logger.warning("Query rewriter import/call failed: %s — using original.", e)
+            retrieval_question = question
+
         with get_openai_callback() as cb:
-            result = self.chain({"question": question})
+            # Send rewritten query to retriever but preserve original for generation
+            result = self.chain({
+                "question": retrieval_question if retrieval_question != question else question
+            })
             self.total_tokens_used += cb.total_tokens
 
         sources = list({
@@ -182,6 +203,8 @@ class RAGPipeline:
             "sources": sources,
             "tokens_used": cb.total_tokens,
             "total_tokens": self.total_tokens_used,
+            "query_rewritten": retrieval_question != question,
+            "retrieval_query": retrieval_question,
         }
 
     def reset_memory(self):
