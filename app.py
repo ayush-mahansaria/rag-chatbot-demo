@@ -14,15 +14,15 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # LangChain imports
-from langchain.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferWindowMemory
-from langchain.callbacks import get_openai_callback
-from langchain.schema import Document
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.chat_models import ChatOpenAI
+from langchain_classic.chains import ConversationalRetrievalChain
+from langchain_classic.memory import ConversationBufferWindowMemory
+from langchain_community.callbacks.manager import get_openai_callback
+from langchain_core.documents import Document
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -31,11 +31,11 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────
-CHUNK_SIZE = 800
+CHUNK_SIZE = 1000                   # Can be larger because gpt-4o-mini handles context better
+TOP_K_RETRIEVAL = 8                 # Retrieve more chunks for better accuracy
 CHUNK_OVERLAP = 150
-TOP_K_RETRIEVAL = 5
-MODEL_NAME = "gpt-3.5-turbo"          # swap to "gpt-4" for higher quality
-EMBED_MODEL = "text-embedding-ada-002"
+MODEL_NAME = "gpt-4o-mini"          # swap to "gpt-5-mini" for higher quality
+EMBED_MODEL = "text-embedding-3-large" # Much more accurate retrieval than ada-002
 VECTOR_DB_PATH = "vectorstore/faiss_index"
 
 
