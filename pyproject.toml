@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "rag-chatbot"
+version = "1.2.0"
+description = "Production RAG pipeline — LangChain · FAISS · OpenAI · FastAPI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Ayush Mahansaria", email = "mahansaria.ayush@gmail.com"}
+]
+keywords = ["rag", "langchain", "llm", "faiss", "openai", "chatbot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
